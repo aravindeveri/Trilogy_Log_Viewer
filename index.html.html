@@ -1,0 +1,2834 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trilogy Log Reader</title>
+    <meta name="author" content="Aravind Rajagopal" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0d0f12;
+        --bg2: #141720;
+        --bg3: #1c2030;
+        --bg4: #222840;
+        --bg5: #2a3050;
+        --border: rgba(255, 255, 255, 0.07);
+        --border2: rgba(255, 255, 255, 0.13);
+        --text: #e8eaf0;
+        --text2: #8a8fa8;
+        --text3: #4e5268;
+        --accent: #4f8ef7;
+        --info: #4f8ef7;
+        --info-bg: rgba(79, 142, 247, 0.12);
+        --info-border: rgba(79, 142, 247, 0.3);
+        --debug: #7c8fa8;
+        --debug-bg: rgba(124, 143, 168, 0.1);
+        --debug-border: rgba(124, 143, 168, 0.25);
+        --warn: #f0a832;
+        --warn-bg: rgba(240, 168, 50, 0.12);
+        --warn-border: rgba(240, 168, 50, 0.35);
+        --error: #ef5350;
+        --error-bg: rgba(239, 83, 80, 0.12);
+        --error-border: rgba(239, 83, 80, 0.35);
+        --green: #4caf82;
+        --purple: #a78bfa;
+        --radius: 6px;
+        --radius-lg: 10px;
+        --mono: "JetBrains Mono", monospace;
+        --sans: "Syne", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 13px;
+        overflow: hidden;
+      }
+
+      /* ─── LAYOUT ─── */
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      /* ─── TOPBAR ─── */
+      #topbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 18px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg2);
+        flex-shrink: 0;
+        flex-wrap: wrap;
+      }
+      .logo {
+        font-family: var(--sans);
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.3px;
+        white-space: nowrap;
+      }
+      .logo span {
+        color: var(--accent);
+      }
+
+      .file-tabs {
+        display: flex;
+        gap: 4px;
+        flex: 1;
+        overflow-x: auto;
+        min-width: 0;
+      }
+      .file-tabs::-webkit-scrollbar {
+        height: 3px;
+      }
+      .file-tabs::-webkit-scrollbar-thumb {
+        background: var(--bg5);
+      }
+
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: var(--radius);
+        font-size: 11px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        white-space: nowrap;
+        color: var(--text2);
+        transition: all 0.15s;
+        max-width: 200px;
+      }
+      .tab:hover {
+        background: var(--bg3);
+        color: var(--text);
+      }
+      .tab.active {
+        background: var(--bg4);
+        border-color: var(--border2);
+        color: var(--text);
+      }
+      .tab-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tab-close {
+        opacity: 0.45;
+        font-size: 11px;
+        flex-shrink: 0;
+        padding: 0 2px;
+        border-radius: 3px;
+        line-height: 1;
+      }
+      .tab-close:hover {
+        opacity: 1;
+        background: var(--bg5);
+      }
+
+      .upload-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        color: var(--text);
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 12px;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .upload-btn:hover {
+        background: var(--bg4);
+        border-color: var(--accent);
+      }
+
+      .topbar-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      #entryCount {
+        font-size: 12px;
+        color: var(--text3);
+      }
+
+      /* ─── MAIN LAYOUT ─── */
+      #main {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+        gap: 0;
+      }
+
+      /* ─── WORKFLOW PANEL ─── */
+      #workflowPanel {
+        width: 280px;
+        flex-shrink: 0;
+        border-right: 1px solid var(--border);
+        background: var(--bg2);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      #workflowPanel::-webkit-scrollbar {
+        width: 4px;
+      }
+      #workflowPanel::-webkit-scrollbar-thumb {
+        background: var(--bg5);
+      }
+
+      .panel-header {
+        padding: 9px 12px 6px;
+        font-family: var(--sans);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        color: var(--text3);
+        text-transform: uppercase;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .workflow-content {
+        padding: 12px 10px;
+      }
+
+      .wf-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+        margin-bottom: 14px;
+      }
+      .wf-stat {
+        background: var(--bg3);
+        border-radius: var(--radius);
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+      }
+      .wf-stat-n {
+        font-size: 17px;
+        font-weight: 500;
+      }
+      .wf-stat-l {
+        font-size: 10px;
+        color: var(--text3);
+        margin-top: 1px;
+      }
+
+      .wf-phase {
+        margin-bottom: 14px;
+      }
+      .wf-phase-title {
+        font-size: 9px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.9px;
+        color: var(--text3);
+        margin-bottom: 7px;
+        padding-left: 2px;
+        font-family: var(--sans);
+      }
+
+      .wf-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        padding: 5px 6px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.1s;
+        margin-bottom: 1px;
+      }
+      .wf-step:hover {
+        background: var(--bg3);
+      }
+      .wf-step.active {
+        background: var(--bg4);
+      }
+
+      .wf-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        margin-top: 3px;
+      }
+      .wf-dot.ok {
+        background: var(--green);
+      }
+      .wf-dot.info {
+        background: var(--info);
+      }
+      .wf-dot.cycle {
+        background: var(--purple);
+      }
+      .wf-dot.err {
+        background: var(--error);
+      }
+
+      .wf-label {
+        font-size: 11px;
+        color: var(--text);
+        line-height: 1.3;
+      }
+      .wf-sub {
+        font-size: 10px;
+        color: var(--text3);
+        margin-top: 1px;
+      }
+
+      .wf-badge {
+        font-size: 9px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-weight: 500;
+        margin-left: auto;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+      .wb-err {
+        background: var(--error-bg);
+        color: var(--error);
+        border: 1px solid var(--error-border);
+      }
+      .wb-warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border: 1px solid var(--warn-border);
+      }
+      .wb-ok {
+        background: rgba(74, 222, 128, 0.08);
+        color: var(--green);
+        border: 1px solid rgba(74, 222, 128, 0.2);
+      }
+
+      .wf-divider {
+        width: 1px;
+        height: 8px;
+        background: var(--border2);
+        margin: 2px 0 2px 9px;
+      }
+
+      /* ─── LOG VIEW ─── */
+      #logView {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      /* ─── STATS ROW ─── */
+      #statsRow {
+        display: flex;
+        gap: 1px;
+        background: var(--border);
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .stat-cell {
+        flex: 1;
+        padding: 7px 10px;
+        background: var(--bg2);
+        text-align: center;
+        cursor: pointer;
+        transition: background 0.15s;
+        min-width: 60px;
+      }
+      .stat-cell:hover {
+        background: var(--bg3);
+      }
+      .stat-cell.active {
+        background: var(--bg3);
+        box-shadow: inset 0 -2px 0 var(--sc-color);
+      }
+      .stat-num {
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.1;
+        color: var(--sc-color);
+      }
+      .stat-label {
+        font-size: 9px;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        margin-top: 2px;
+      }
+      .stat-cell.all {
+        --sc-color: var(--text);
+      }
+      .stat-cell.info-s {
+        --sc-color: var(--info);
+      }
+      .stat-cell.debug-s {
+        --sc-color: var(--debug);
+      }
+      .stat-cell.warn-s {
+        --sc-color: var(--warn);
+      }
+      .stat-cell.error-s {
+        --sc-color: var(--error);
+      }
+
+      /* ─── TOOLBAR ─── */
+      #toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg2);
+        flex-shrink: 0;
+        flex-wrap: wrap;
+      }
+      #searchWrap {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        min-width: 150px;
+        background: var(--bg);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        padding: 0 10px;
+      }
+      #searchWrap svg {
+        opacity: 0.3;
+        flex-shrink: 0;
+      }
+      #searchInput {
+        background: none;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 5px 7px;
+        width: 100%;
+      }
+      #searchInput::placeholder {
+        color: var(--text3);
+      }
+      select {
+        background: var(--bg);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 5px 8px;
+        cursor: pointer;
+        outline: none;
+      }
+      select:hover {
+        border-color: var(--accent);
+      }
+      input[type="time"] {
+        color-scheme: dark;
+      }
+      input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(1) brightness(0.8);
+        cursor: pointer;
+      }
+      .tb-sep {
+        width: 1px;
+        height: 20px;
+        background: var(--border2);
+      }
+      .view-toggle {
+        display: flex;
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .view-btn {
+        padding: 4px 9px;
+        background: var(--bg);
+        border: none;
+        color: var(--text3);
+        cursor: pointer;
+        font-size: 11px;
+        font-family: var(--mono);
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .view-btn.active {
+        background: var(--bg4);
+        color: var(--text);
+      }
+
+      /* ─── LOG LIST ─── */
+      #logList {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        min-width: 0;
+      }
+      #logList::-webkit-scrollbar {
+        width: 5px;
+      }
+      #logList::-webkit-scrollbar-track {
+        background: var(--bg);
+      }
+      #logList::-webkit-scrollbar-thumb {
+        background: var(--bg4);
+        border-radius: 3px;
+      }
+
+      .log-entry {
+        display: grid;
+        grid-template-columns: 4px 1fr;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .log-entry:hover {
+        background: var(--bg3);
+      }
+      .log-entry.selected {
+        background: var(--bg3);
+      }
+      .log-entry.highlight {
+        background: rgba(240, 168, 50, 0.15);
+        border-left: 3px solid var(--warn);
+      }
+      .entry-bar {
+        width: 4px;
+      }
+      .entry-bar.info {
+        background: var(--info);
+      }
+      .entry-bar.debug {
+        background: var(--debug);
+      }
+      .entry-bar.warn {
+        background: var(--warn);
+      }
+      .entry-bar.error {
+        background: var(--error);
+      }
+      .entry-body {
+        padding: 7px 12px;
+        min-width: 0;
+      }
+      .entry-row1 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+      }
+      .level-badge {
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        padding: 2px 5px;
+        border-radius: 3px;
+        flex-shrink: 0;
+        text-transform: uppercase;
+        font-family: var(--mono);
+      }
+      .lb-info {
+        background: var(--info-bg);
+        color: var(--info);
+        border: 1px solid var(--info-border);
+      }
+      .lb-debug {
+        background: var(--debug-bg);
+        color: var(--debug);
+        border: 1px solid var(--debug-border);
+      }
+      .lb-warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border: 1px solid var(--warn-border);
+      }
+      .lb-error {
+        background: var(--error-bg);
+        color: var(--error);
+        border: 1px solid var(--error-border);
+      }
+      .entry-activity {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+      }
+      .entry-comp {
+        font-size: 10px;
+        color: var(--text3);
+        white-space: nowrap;
+        font-family: var(--mono);
+      }
+      .entry-time {
+        font-size: 10px;
+        color: var(--text3);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .entry-row2 {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 2px;
+      }
+      .entry-msg {
+        font-size: 11px;
+        color: var(--text2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .entry-file {
+        font-size: 9px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        flex-shrink: 0;
+        border: 1px solid;
+        white-space: nowrap;
+        margin-left: auto;
+      }
+
+      /* ─── DETAIL PANEL ─── */
+      #detailPanel {
+        width: 380px;
+        flex-shrink: 0;
+        border-left: 1px solid var(--border);
+        background: var(--bg2);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      #detailPanel::-webkit-scrollbar {
+        width: 4px;
+      }
+      #detailPanel::-webkit-scrollbar-thumb {
+        background: var(--bg4);
+        border-radius: 2px;
+      }
+
+      #detailEmpty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text3);
+        gap: 8px;
+        font-size: 11px;
+        padding: 40px 20px;
+        text-align: center;
+      }
+      #detailContent {
+        display: none;
+        padding: 14px;
+      }
+      #detailContent.visible {
+        display: block;
+      }
+
+      .detail-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .detail-level-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        margin-top: 4px;
+      }
+      .dld-info {
+        background: var(--info);
+      }
+      .dld-debug {
+        background: var(--debug);
+      }
+      .dld-warn {
+        background: var(--warn);
+      }
+      .dld-error {
+        background: var(--error);
+      }
+      .detail-title {
+        font-family: var(--sans);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.3;
+      }
+      .detail-subtitle {
+        font-size: 11px;
+        color: var(--text2);
+        margin-top: 3px;
+      }
+
+      .detail-section {
+        margin-bottom: 13px;
+      }
+      .detail-section-label {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text3);
+        margin-bottom: 7px;
+        font-family: var(--sans);
+      }
+      .detail-kv {
+        display: grid;
+        grid-template-columns: 85px 1fr;
+        gap: 4px 10px;
+      }
+      .dk {
+        font-size: 11px;
+        color: var(--text3);
+        padding: 2px 0;
+      }
+      .dv {
+        font-size: 11px;
+        color: var(--text);
+        padding: 2px 0;
+        word-break: break-all;
+      }
+
+      .ctx-box {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px;
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--text2);
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 300px;
+        overflow-y: auto;
+        line-height: 1.55;
+      }
+      .ctx-box::-webkit-scrollbar {
+        width: 3px;
+      }
+      .ctx-box::-webkit-scrollbar-thumb {
+        background: var(--bg5);
+      }
+
+      /* JSON syntax */
+      .jk {
+        color: #7ec8f7;
+      }
+      .js {
+        color: #a8d8a0;
+      }
+      .jn {
+        color: #f0c070;
+      }
+      .jb {
+        color: #f07070;
+      }
+      .jnu {
+        color: var(--text3);
+      }
+
+      .copy-btn {
+        font-size: 11px;
+        padding: 5px 11px;
+        background: var(--bg);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        color: var(--text2);
+        cursor: pointer;
+        font-family: var(--mono);
+        transition: all 0.12s;
+        margin-top: 6px;
+      }
+      .copy-btn:hover {
+        border-color: var(--border2);
+        color: var(--text);
+      }
+
+      /* ─── UPLOAD LANDING ─── */
+      #uploadLanding {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+      }
+      .drop-zone {
+        border: 1.5px dashed var(--border2);
+        border-radius: var(--radius-lg);
+        padding: 50px 70px;
+        text-align: center;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+        max-width: 500px;
+      }
+      .drop-zone:hover,
+      .drop-zone.drag-over {
+        border-color: var(--accent);
+        background: rgba(79, 142, 247, 0.05);
+      }
+      .drop-icon {
+        width: 46px;
+        height: 46px;
+        background: var(--bg3);
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 13px;
+      }
+      .drop-title {
+        font-family: var(--sans);
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 6px;
+      }
+      .drop-sub {
+        font-size: 12px;
+        color: var(--text2);
+        line-height: 1.6;
+      }
+      .drop-hint {
+        font-size: 11px;
+        color: var(--text3);
+        margin-top: 11px;
+      }
+      .drop-formats {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+        margin-top: 13px;
+      }
+      .fmt-badge {
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-size: 10px;
+        color: var(--text3);
+      }
+
+      /* ─── EMPTY STATE ─── */
+      .empty-state {
+        padding: 50px 20px;
+        text-align: center;
+        color: var(--text3);
+        font-size: 12px;
+      }
+      .empty-state p {
+        margin-top: 5px;
+        font-size: 11px;
+      }
+
+      /* ─── HIGHLIGHT ─── */
+      mark {
+        background: rgba(240, 168, 50, 0.25);
+        color: var(--warn);
+        border-radius: 2px;
+        padding: 0 1px;
+      }
+
+      /* ─── PROGRESS ─── */
+      #loadProgress {
+        position: fixed;
+        inset: 0;
+        background: rgba(13, 15, 18, 0.92);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 13px;
+        z-index: 999;
+      }
+      .progress-bar-wrap {
+        width: 280px;
+        height: 3px;
+        background: var(--bg3);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .progress-bar {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 2px;
+        transition: width 0.15s;
+        width: 0%;
+      }
+      .progress-label {
+        font-size: 12px;
+        color: var(--text2);
+      }
+
+      /* ─── COMPACT VIEW ─── */
+      .log-entry.compact .entry-body {
+        padding: 4px 12px;
+      }
+      .log-entry.compact .entry-row2 {
+        display: none;
+      }
+
+      /* ─── MOBILE CONTROLS ─── */
+      .mobile-menu-btn {
+        display: none;
+        padding: 6px 10px;
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 12px;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+      }
+      .mobile-menu-btn:hover {
+        background: var(--bg4);
+      }
+
+      .panel-close-btn {
+        display: none;
+        position: sticky;
+        top: 0;
+        padding: 8px;
+        background: var(--bg2);
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        color: var(--text3);
+        font-size: 12px;
+        z-index: 10;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .panel-close-btn:hover {
+        background: var(--bg3);
+        color: var(--text);
+      }
+
+      /* ─── RESPONSIVE ─── */
+      @media (max-width: 1200px) {
+        #workflowPanel {
+          width: 240px;
+        }
+        #detailPanel {
+          width: 320px;
+        }
+      }
+
+      @media (max-width: 900px) {
+        #workflowPanel {
+          width: 220px;
+        }
+        #detailPanel {
+          width: 280px;
+        }
+        .drop-zone {
+          padding: 40px 50px;
+        }
+      }
+
+      @media (max-width: 768px) {
+        html,
+        body {
+          font-size: 12px;
+        }
+
+        #topbar {
+          padding: 8px 12px;
+          gap: 8px;
+        }
+        .logo {
+          font-size: 14px;
+        }
+        .upload-btn {
+          padding: 5px 10px;
+          font-size: 11px;
+        }
+        #entryCount {
+          display: none;
+        }
+
+        .file-tabs {
+          max-width: 200px;
+        }
+        .tab {
+          font-size: 10px;
+          padding: 4px 8px;
+        }
+
+        /* Mobile panel controls */
+        .mobile-menu-btn {
+          display: flex;
+        }
+        .panel-close-btn {
+          display: flex;
+        }
+
+        /* Panels become overlays */
+        #workflowPanel,
+        #detailPanel {
+          position: fixed;
+          top: 0;
+          bottom: 0;
+          z-index: 100;
+          width: 85%;
+          max-width: 320px;
+          transform: translateX(-100%);
+          transition: transform 0.3s ease;
+          box-shadow: 2px 0 12px rgba(0, 0, 0, 0.5);
+        }
+        #workflowPanel.open {
+          transform: translateX(0);
+        }
+        #detailPanel {
+          right: 0;
+          left: auto;
+          transform: translateX(100%);
+          border-left: 1px solid var(--border);
+        }
+        #detailPanel.open {
+          transform: translateX(0);
+        }
+
+        /* Overlay backdrop */
+        .panel-backdrop {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.6);
+          z-index: 99;
+        }
+        .panel-backdrop.visible {
+          display: block;
+        }
+
+        #toolbar {
+          padding: 6px 10px;
+          gap: 6px;
+          flex-direction: column;
+        }
+        #toolbar > div,
+        #toolbar > select {
+          width: 100%;
+          margin: 2px 0;
+        }
+        #searchWrap {
+          min-width: 100%;
+          order: -1;
+        }
+        select {
+          font-size: 10px;
+          padding: 4px 6px;
+        }
+
+        .stat-cell {
+          padding: 6px 8px;
+          min-width: 50px;
+        }
+        .stat-num {
+          font-size: 14px;
+        }
+        .stat-label {
+          font-size: 8px;
+        }
+
+        .drop-zone {
+          padding: 30px 20px;
+          max-width: 100%;
+        }
+        .drop-title {
+          font-size: 15px;
+        }
+        .drop-sub {
+          font-size: 11px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        html,
+        body {
+          font-size: 11px;
+        }
+
+        #topbar {
+          padding: 6px 10px;
+        }
+        .logo {
+          font-size: 13px;
+        }
+
+        .file-tabs {
+          max-width: 150px;
+        }
+
+        #toolbar {
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+        #toolbar > div,
+        #toolbar > select {
+          flex: 1 1 100%;
+          width: 100%;
+        }
+        #searchWrap {
+          flex: 1 1 100%;
+          order: -1;
+          margin-bottom: 2px;
+        }
+        .view-toggle {
+          flex: 0 1 auto;
+          width: auto;
+          margin-left: 0;
+        }
+
+        .wf-stat {
+          padding: 6px 8px;
+        }
+        .wf-stat-n {
+          font-size: 15px;
+        }
+
+        .entry-row1 {
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+        .entry-activity {
+          flex: 1 1 100%;
+          order: 2;
+        }
+        .entry-time {
+          margin-left: auto;
+        }
+
+        #detailPanel {
+          width: 100%;
+          max-width: 100%;
+        }
+
+        .detail-kv {
+          grid-template-columns: 75px 1fr;
+          gap: 3px 8px;
+        }
+
+        .drop-icon {
+          width: 38px;
+          height: 38px;
+        }
+        .drop-title {
+          font-size: 14px;
+        }
+        .drop-sub {
+          font-size: 10px;
+        }
+        .drop-formats {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- TOPBAR -->
+      <div id="topbar">
+        <button
+          class="mobile-menu-btn"
+          id="btnWorkflow"
+          onclick="toggleWorkflowPanel()"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M2 4h12M2 8h12M2 12h12"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+          </svg>
+          Workflow
+        </button>
+        <div class="logo">TRILOGY <span>LOGS</span></div>
+        <div class="file-tabs" id="fileTabs"></div>
+        <div class="topbar-right">
+          <span id="entryCount"></span>
+          <label class="upload-btn" for="fileInput" id="uploadBtn">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 2v9M4 5l4-3 4 3M2 12h12v2H2z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Load files
+          </label>
+          <input
+            type="file"
+            id="fileInput"
+            accept=".log,.txt"
+            multiple
+            style="display: none"
+          />
+        </div>
+      </div>
+
+      <!-- UPLOAD LANDING -->
+      <div id="uploadLanding">
+        <label class="drop-zone" id="dropZone" for="fileInput">
+          <div class="drop-icon">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 3v11M8 9l4-4 4 4"
+                stroke="#4f8ef7"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M4 17h16"
+                stroke="#4f8ef7"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+              <path
+                d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"
+                stroke="#4f8ef7"
+                stroke-width="1.6"
+              />
+            </svg>
+          </div>
+          <div class="drop-title">Drop log files here</div>
+          <div class="drop-sub">
+            Upload one or multiple .log files<br />Analyze workflow and compare
+            sessions
+          </div>
+          <div class="drop-hint">
+            Supports Trilogy kiosk JS-object format &amp; multi-file drag &amp;
+            drop
+          </div>
+          <div class="drop-formats">
+            <span class="fmt-badge">.log</span>
+            <span class="fmt-badge">.txt</span>
+            <span class="fmt-badge">multi-file</span>
+            <span class="fmt-badge">drag &amp; drop</span>
+          </div>
+        </label>
+      </div>
+
+      <!-- MAIN VIEW (hidden until loaded) -->
+      <div id="main" style="display: none">
+        <!-- Mobile backdrop -->
+        <div
+          class="panel-backdrop"
+          id="panelBackdrop"
+          onclick="closePanels()"
+        ></div>
+        <!-- WORKFLOW PANEL -->
+        <div id="workflowPanel">
+          <div class="panel-close-btn" onclick="toggleWorkflowPanel()">
+            <span>Workflow Analysis</span>
+            <span style="font-size: 16px">×</span>
+          </div>
+          <div class="panel-header">Workflow</div>
+          <div class="workflow-content" id="workflowContent"></div>
+        </div>
+
+        <!-- LOG VIEW -->
+        <div id="logView">
+          <div id="statsRow">
+            <div class="stat-cell all active" onclick="filterLevel('all')">
+              <div class="stat-num" id="st-all">0</div>
+              <div class="stat-label">All</div>
+            </div>
+            <div class="stat-cell info-s" onclick="filterLevel('info')">
+              <div class="stat-num" id="st-info">0</div>
+              <div class="stat-label">Info</div>
+            </div>
+            <div class="stat-cell debug-s" onclick="filterLevel('debug')">
+              <div class="stat-num" id="st-debug">0</div>
+              <div class="stat-label">Debug</div>
+            </div>
+            <div class="stat-cell warn-s" onclick="filterLevel('warn')">
+              <div class="stat-num" id="st-warn">0</div>
+              <div class="stat-label">Warn</div>
+            </div>
+            <div class="stat-cell error-s" onclick="filterLevel('error')">
+              <div class="stat-num" id="st-error">0</div>
+              <div class="stat-label">Error</div>
+            </div>
+          </div>
+
+          <div id="toolbar">
+            <div id="searchWrap" style="flex: 1.5; min-width: 200px">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle
+                  cx="7"
+                  cy="7"
+                  r="4.5"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                />
+                <path
+                  d="M10.5 10.5L14 14"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <input
+                type="text"
+                id="searchInput"
+                placeholder="Search activity, message, component, time..."
+                autocomplete="off"
+              />
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                flex: 1;
+                min-width: 250px;
+                flex-wrap: wrap;
+              "
+            >
+              <span
+                style="
+                  font-size: 10px;
+                  color: var(--text3);
+                  white-space: nowrap;
+                "
+                >Time:</span
+              >
+              <input
+                type="time"
+                id="timeStart"
+                title="Start time"
+                style="
+                  font-size: 11px;
+                  padding: 4px 6px;
+                  background: var(--bg);
+                  border: 1px solid var(--border2);
+                  border-radius: var(--radius);
+                  color: var(--text);
+                  font-family: var(--mono);
+                  cursor: pointer;
+                  outline: none;
+                  flex: 0.7;
+                  min-width: 80px;
+                "
+              />
+              <span style="font-size: 10px; color: var(--text3)">to</span>
+              <input
+                type="time"
+                id="timeEnd"
+                title="End time"
+                style="
+                  font-size: 11px;
+                  padding: 4px 6px;
+                  background: var(--bg);
+                  border: 1px solid var(--border2);
+                  border-radius: var(--radius);
+                  color: var(--text);
+                  font-family: var(--mono);
+                  cursor: pointer;
+                  outline: none;
+                  flex: 0.7;
+                  min-width: 80px;
+                "
+              />
+              <button
+                id="clearTimeBtn"
+                onclick="clearTimeFilter()"
+                style="
+                  padding: 4px 8px;
+                  font-size: 10px;
+                  background: var(--bg);
+                  border: 1px solid var(--border2);
+                  border-radius: var(--radius);
+                  color: var(--text3);
+                  cursor: pointer;
+                  font-family: var(--mono);
+                  flex-shrink: 0;
+                "
+                title="Clear time filter"
+              >
+                ✕
+              </button>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                flex: 1.2;
+                min-width: 300px;
+                flex-wrap: wrap;
+              "
+            >
+              <span
+                style="
+                  font-size: 10px;
+                  color: var(--text3);
+                  white-space: nowrap;
+                "
+                >Highlight:</span
+              >
+              <input
+                type="text"
+                id="highlightInput"
+                placeholder="Find..."
+                autocomplete="off"
+                style="
+                  font-size: 11px;
+                  padding: 4px 8px;
+                  background: var(--bg);
+                  border: 1px solid var(--border2);
+                  border-radius: var(--radius);
+                  color: var(--text);
+                  font-family: var(--mono);
+                  flex: 1;
+                  min-width: 80px;
+                "
+              />
+              <span
+                id="highlightCount"
+                style="
+                  font-size: 10px;
+                  color: var(--text3);
+                  min-width: 32px;
+                  text-align: center;
+                  font-family: var(--mono);
+                  white-space: nowrap;
+                  flex-shrink: 0;
+                "
+              ></span>
+              <button
+                id="clearHighlightBtn"
+                onclick="clearHighlight()"
+                style="
+                  padding: 4px 8px;
+                  font-size: 10px;
+                  background: var(--bg);
+                  border: 1px solid var(--border2);
+                  border-radius: var(--radius);
+                  color: var(--text3);
+                  cursor: pointer;
+                  font-family: var(--mono);
+                  flex-shrink: 0;
+                "
+                title="Clear highlight"
+              >
+                ✕
+              </button>
+            </div>
+            <select
+              id="compFilter"
+              title="Filter by component"
+              style="flex: 0.8; min-width: 100px"
+            >
+              <option value="">All components</option>
+            </select>
+            <select
+              id="actFilter"
+              title="Filter by activity"
+              style="flex: 0.8; min-width: 100px"
+            >
+              <option value="">All activities</option>
+            </select>
+            <div class="tb-sep"></div>
+            <div class="view-toggle">
+              <button
+                class="view-btn active"
+                id="btnList"
+                onclick="setView('list')"
+              >
+                List
+              </button>
+              <button
+                class="view-btn"
+                id="btnCompact"
+                onclick="setView('compact')"
+              >
+                Compact
+              </button>
+            </div>
+            <select
+              id="sortOrder"
+              title="Sort order"
+              style="flex: 0.6; min-width: 90px"
+            >
+              <option value="asc">Oldest first</option>
+              <option value="desc">Newest first</option>
+            </select>
+          </div>
+
+          <div id="logList"></div>
+        </div>
+
+        <!-- DETAIL PANEL -->
+        <div id="detailPanel">
+          <div class="panel-close-btn" onclick="toggleDetailPanel()">
+            <span>Entry Details</span>
+            <span style="font-size: 16px">×</span>
+          </div>
+          <div id="detailEmpty">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 32 32"
+              fill="none"
+              opacity=".25"
+            >
+              <rect
+                x="6"
+                y="4"
+                width="20"
+                height="24"
+                rx="3"
+                stroke="currentColor"
+                stroke-width="1.5"
+              />
+              <path
+                d="M11 12h10M11 16h10M11 20h6"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span>Select an entry to inspect</span>
+          </div>
+          <div id="detailContent"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOADING -->
+    <div id="loadProgress">
+      <div class="progress-label" id="progressLabel">Loading log files...</div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </div>
+
+    <script>
+      // ─── STATE ───
+      const FILES = [];
+      const FILE_COLORS = [
+        "#4f8ef7",
+        "#a78bfa",
+        "#2dd4bf",
+        "#f97316",
+        "#f472b6",
+        "#facc15",
+      ];
+      let activeFileIdx = -1; // -1 = all files
+      let filtered = [];
+      let activeLevel = "all";
+      let currentView = "list";
+      let selectedIdx = -1;
+      let activeWorkflowStep = null;
+      let highlightQuery = ""; // Highlight search without filtering
+      let highlightedIndices = []; // Array of highlighted entry indices
+      let currentHighlightIdx = -1; // Current highlighted entry being viewed
+      let repeatCounts = {}; // Track repeated logs: key = "activity|message", value = count
+
+      // Virtual scroll state
+      const CHUNK_SIZE = 100; // Render 100 items at a time
+      let visibleStart = 0;
+      let visibleEnd = CHUNK_SIZE;
+      let scrollTimeout = null;
+
+      // ─── WORKFLOW PHASES ───
+      const WORKFLOW_PHASES = [
+        {
+          title: "Startup",
+          steps: [
+            {
+              id: "logger",
+              label: "Logger & Config Init",
+              sub: "Mask Logger, App Config, File Service",
+              acts: [
+                "Mask Logger",
+                "App Config",
+                "Log Masking",
+                "File Service Init",
+                "Save JSON File",
+                "Parsing Completed",
+              ],
+              dot: "ok",
+            },
+            {
+              id: "core",
+              label: "Core Engine Load",
+              sub: "CoreEngine init via CDN fetch",
+              acts: [
+                "CoreEngine Init",
+                "Set Core Engine",
+                "INTERCEPTOR",
+                "Set Game Asset Engine",
+                "Set Asset Engine",
+              ],
+              dot: "info",
+            },
+            {
+              id: "assets",
+              label: "Asset Download",
+              sub: "Validate, download & unzip framework assets",
+              acts: [
+                "Asset Download",
+                "Initiating Asset Download",
+                "Download Asset",
+                "Validating Asset",
+                "Downloading Assets",
+              ],
+              dot: "ok",
+            },
+            {
+              id: "engines",
+              label: "Engines Initialized",
+              sub: "AssetRenderer + GameEngine ready",
+              acts: [
+                "AssetRendererEngine Init",
+                "GameRendererEngine Init",
+                "Asset Engine Status",
+                "Game Engine Status",
+              ],
+              dot: "ok",
+            },
+          ],
+        },
+        {
+          title: "Authentication",
+          steps: [
+            {
+              id: "auth",
+              label: "Auth & Token Fetch",
+              sub: "PKCE flow, token refresh scheduled",
+              acts: ["Auth Process", "Trigger Refresh Token"],
+              dot: "info",
+            },
+            {
+              id: "sysconf",
+              label: "System Config & Modules",
+              sub: "v1/system/config, api/v1/modules, api/v1/config",
+              acts: ["GetSystemConfig", "GetSystemModule", "GetConfig"],
+              dot: "ok",
+            },
+            {
+              id: "kioskinfo",
+              label: "Kiosk Registration",
+              sub: "Device detail, tier check, kiosk info sync",
+              acts: ["GetKioskInfo", "POST - GetKioskInfo API"],
+              dot: "ok",
+            },
+          ],
+        },
+        {
+          title: "Kiosk Ready",
+          steps: [
+            {
+              id: "screens",
+              label: "Screen Version Check",
+              sub: "Hash comparison, download changed screens",
+              acts: [
+                "VersionCheck - GetKioskScreens",
+                "Download Worker versionCheck",
+                "Caching Kiosk Screens",
+                "Checking GetKioskScreens Versions",
+              ],
+              dot: "ok",
+            },
+            {
+              id: "printer",
+              label: "Printer Service",
+              sub: "Kill → restart PrinterService.exe",
+              acts: [
+                "Kiling Existing Printer Service",
+                "Init Printer Socket",
+                "Printer Service",
+                "Start Child Process",
+              ],
+              dot: "ok",
+            },
+            {
+              id: "ws",
+              label: "WebSocket Connection",
+              sub: "Register device, join channel",
+              acts: [
+                "Websocket initiated",
+                "Websocket connected",
+                "Websocket device register",
+                "Websocket channel joined",
+              ],
+              dot: "ok",
+            },
+            {
+              id: "ui",
+              label: "UI Mounted",
+              sub: "Main iframe + SideNavBar rendered",
+              acts: [
+                "Loading Startup Screen",
+                "Main Iframe Loaded",
+                "Load Iframe",
+                "SideNavBar",
+                "Loading SideNavBar",
+              ],
+              dot: "ok",
+            },
+            {
+              id: "card",
+              label: "Card Reader Active",
+              sub: "MSR listener started, IPC events wired",
+              acts: ["Listen Card Reader", "IPC Renderer Events"],
+              dot: "ok",
+            },
+          ],
+        },
+        {
+          title: "Runtime Cycle",
+          steps: [
+            {
+              id: "timers",
+              label: "Timers Running",
+              sub: "Idle, WatchDog, Config, AssetUpdate, KioskInfo",
+              acts: [
+                "SystemIdleTimer",
+                "WatchDog Service",
+                "ConfigTimer",
+                "AssetUpdateTimer",
+                "IdleTimer",
+                "KioskInfoTimer",
+              ],
+              dot: "cycle",
+            },
+            {
+              id: "session",
+              label: "Session Lifecycle",
+              sub: "Idle timeout → session destroy → re-auth",
+              acts: [
+                "Session Service",
+                "IdleTimer",
+                "Idle Timer Events",
+                "logoutAction",
+                "Destroy Session",
+              ],
+              dot: "cycle",
+            },
+            {
+              id: "events",
+              label: "Event Dispatch",
+              sub: "Inbound/outbound AssetEngine events",
+              acts: [
+                "Dispatch Event Details",
+                "Dispatch Event",
+                "Async Service",
+                "HandleEvent",
+              ],
+              dot: "cycle",
+            },
+            {
+              id: "health",
+              label: "System Health Polling",
+              sub: "CPU, memory, kiosk status & version checks",
+              acts: [
+                "System Information",
+                "getKioskInfo",
+                "VersionCheck - GetKioskScreens",
+              ],
+              dot: "cycle",
+            },
+            {
+              id: "promo",
+              label: "Promo & Alert Updates",
+              sub: "Alert status, promo screen downloads",
+              acts: [
+                "Promo screens download",
+                "POST - Alert Status Update Success",
+                "PromoDetail",
+              ],
+              dot: "cycle",
+            },
+          ],
+        },
+      ];
+
+      // ─── PARSE ───
+      function parseLog(text, fileName) {
+        const parts = text.split(/\}\r?\n\s*\{/);
+        return parts.map((p) => parseEntry(p, fileName)).filter(Boolean);
+      }
+
+      function parseEntry(text, fileName) {
+        function get(key) {
+          let m = text.match(
+            new RegExp(`^\\s*${key}:\\s*'((?:[^'\\\\]|\\\\.)*)'`, "m"),
+          );
+          if (m) return m[1].replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+          m = text.match(
+            new RegExp(`^\\s*${key}:\\s*"((?:[^"\\\\]|\\\\.)*?)"`, "m"),
+          );
+          if (m) return m[1];
+          return "";
+        }
+        const level = get("level");
+        // Capture all entries, even with non-standard levels
+        if (!level) return null;
+
+        // Normalize level if it's a non-standard value
+        const normalizedLevel = ["info", "debug", "warn", "error"].includes(
+          level,
+        )
+          ? level
+          : "info";
+
+        return {
+          level: normalizedLevel,
+          activity: get("activity"),
+          message: get("message"),
+          component: get("component"),
+          context: get("context"),
+          dateTime: get("dateTime"),
+          macaddress: get("macaddress"),
+          file: fileName || "",
+        };
+      }
+
+      // ─── LOAD FILES ───
+      function loadFiles(files) {
+        if (!files || files.length === 0) return;
+
+        const fileArray = Array.from(files);
+        const fileCount = fileArray.length;
+
+        document.getElementById("loadProgress").style.display = "flex";
+        setProgress(10, "Reading files...");
+
+        let done = 0;
+        const results = new Array(fileCount);
+
+        fileArray.forEach((file, idx) => {
+          const reader = new FileReader();
+
+          reader.onload = (e) => {
+            results[idx] = { name: file.name, text: e.target.result || "" };
+            done++;
+            const pct = 10 + (done / fileCount) * 40;
+            setProgress(pct, `Reading files... (${done}/${fileCount})`);
+
+            if (done === fileCount) {
+              processFiles(results);
+            }
+          };
+
+          reader.onerror = (err) => {
+            results[idx] = { name: file.name, text: "" };
+            done++;
+            const pct = 10 + (done / fileCount) * 40;
+            setProgress(pct, `Reading files... (${done}/${fileCount})`);
+
+            if (done === fileCount) {
+              processFiles(results);
+            }
+          };
+
+          try {
+            reader.readAsText(file);
+          } catch (ex) {
+            results[idx] = { name: file.name, text: "" };
+            done++;
+            if (done === fileCount) {
+              processFiles(results);
+            }
+          }
+        });
+      }
+
+      function processFiles(results) {
+        setProgress(55, "Parsing entries...");
+
+        setTimeout(() => {
+          results.forEach((r) => {
+            if (!r.text) return;
+
+            const existing = FILES.findIndex((f) => f.name === r.name);
+            const entries = parseLog(r.text, r.name);
+
+            if (existing >= 0) {
+              FILES[existing].entries = entries;
+            } else {
+              FILES.push({
+                name: r.name,
+                entries,
+                color: FILE_COLORS[FILES.length % FILE_COLORS.length],
+              });
+            }
+          });
+
+          setProgress(85, "Building index...");
+
+          setTimeout(() => {
+            setProgress(100, "Done");
+
+            setTimeout(() => {
+              document.getElementById("loadProgress").style.display = "none";
+              document.getElementById("uploadLanding").style.display = "none";
+              document.getElementById("main").style.display = "flex";
+
+              renderTabs();
+              rebuildDropdowns();
+              buildWorkflow();
+              applyFilters();
+            }, 200);
+          }, 100);
+        }, 50);
+      }
+
+      function setProgress(pct, label) {
+        document.getElementById("progressBar").style.width = pct + "%";
+        document.getElementById("progressLabel").textContent = label;
+      }
+
+      // ─── TABS ───
+      function renderTabs() {
+        const tabs = document.getElementById("fileTabs");
+        let html = "";
+
+        if (FILES.length > 1) {
+          html += `<div class="tab ${activeFileIdx === -1 ? "active" : ""}" onclick="switchFile(-1)">
+      <span class="tab-name">All files</span>
+      <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--bg5);color:var(--text3);margin-left:2px">${FILES.length}</span>
+    </div>`;
+        }
+
+        FILES.forEach((f, i) => {
+          const shortName = f.name.replace(/\.log$/i, "").slice(0, 20);
+          html += `<div class="tab ${activeFileIdx === i ? "active" : ""}" onclick="switchFile(${i})" style="border-left:2px solid ${f.color}">
+      <span class="tab-name" title="${escHtml(f.name)}">${escHtml(shortName)}</span>
+      <span class="tab-close" onclick="removeFile(event, ${i})">✕</span>
+    </div>`;
+        });
+
+        tabs.innerHTML = html;
+      }
+
+      function switchFile(idx) {
+        activeFileIdx = idx;
+        activeWorkflowStep = null;
+        renderTabs();
+        buildWorkflow();
+        applyFilters();
+      }
+
+      function removeFile(e, idx) {
+        e.stopPropagation();
+        FILES.splice(idx, 1);
+
+        if (!FILES.length) {
+          document.getElementById("uploadLanding").style.display = "flex";
+          document.getElementById("main").style.display = "none";
+          document.getElementById("fileTabs").innerHTML = "";
+          return;
+        }
+
+        if (activeFileIdx >= FILES.length) {
+          activeFileIdx = FILES.length > 1 ? -1 : 0;
+        }
+
+        renderTabs();
+        rebuildDropdowns();
+        buildWorkflow();
+        applyFilters();
+      }
+
+      // ─── SCOPE ───
+      function getEntries() {
+        if (activeFileIdx === -1) {
+          // Combine all files and sort by timestamp
+          const combined = FILES.flatMap((f) => f.entries);
+          return combined.sort((a, b) => {
+            const timeA = parseTimestamp(a.dateTime);
+            const timeB = parseTimestamp(b.dateTime);
+            return timeA - timeB;
+          });
+        }
+        return FILES[activeFileIdx]?.entries || [];
+      }
+
+      function parseTimestamp(dateTime) {
+        if (!dateTime) return 0;
+        // Format: "04-07-2026 21:20:24.958"
+        try {
+          const parts = dateTime.match(
+            /(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)\.(\d+)/,
+          );
+          if (!parts) return 0;
+          const [, month, day, year, hour, min, sec, ms] = parts;
+          return new Date(year, month - 1, day, hour, min, sec, ms).getTime();
+        } catch {
+          return 0;
+        }
+      }
+
+      function extractTime(dateTime) {
+        if (!dateTime) return "";
+        // Format: "04-07-2026 21:20:24.958" -> "21:20:24"
+        try {
+          const parts = dateTime.match(/(\d+):(\d+):(\d+)/);
+          if (parts) return `${parts[1]}:${parts[2]}:${parts[3]}`;
+        } catch {}
+        return "";
+      }
+
+      function fileColor(name) {
+        return FILES.find((f) => f.name === name)?.color || "var(--text3)";
+      }
+
+      // ─── WORKFLOW ───
+      function buildWorkflow() {
+        const entries = getEntries();
+        const content = document.getElementById("workflowContent");
+
+        const counts = { info: 0, debug: 0, warn: 0, error: 0 };
+        entries.forEach((e) => {
+          if (counts[e.level] !== undefined) counts[e.level]++;
+        });
+
+        // Calculate step counts and time ranges
+        WORKFLOW_PHASES.forEach((ph) => {
+          ph.steps.forEach((step) => {
+            const stepEntries = entries.filter((e) =>
+              step.acts.some((a) => e.activity.includes(a)),
+            );
+
+            step.count = stepEntries.length;
+            step.errCount = stepEntries.filter(
+              (e) => e.level === "error",
+            ).length;
+            step.warnCount = stepEntries.filter(
+              (e) => e.level === "warn",
+            ).length;
+
+            // Get time range for this step
+            if (stepEntries.length > 0) {
+              const times = stepEntries.map((e) => e.dateTime).filter(Boolean);
+              if (times.length > 0) {
+                step.firstTime = times[0];
+                step.lastTime = times[times.length - 1];
+
+                // Calculate duration
+                const start = parseTimestamp(times[0]);
+                const end = parseTimestamp(times[times.length - 1]);
+                if (start && end) {
+                  step.duration = Math.max(0, (end - start) / 1000); // seconds
+                }
+              }
+            }
+          });
+        });
+
+        // Calculate overall time range
+        const allTimes = entries.map((e) => e.dateTime).filter(Boolean);
+        let timeRangeHTML = "";
+        let totalDuration = 0;
+
+        if (allTimes.length > 1) {
+          const start = parseTimestamp(allTimes[0]);
+          const end = parseTimestamp(allTimes[allTimes.length - 1]);
+          totalDuration = (end - start) / 1000; // seconds
+
+          const startTime = allTimes[0].split(" ")[1] || allTimes[0];
+          const endTime =
+            allTimes[allTimes.length - 1].split(" ")[1] ||
+            allTimes[allTimes.length - 1];
+
+          timeRangeHTML = `<div style="font-size:10px;color:var(--text3);margin-top:8px;padding:6px 8px;background:var(--bg);border-radius:4px;border:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+        <span>Start: ${escHtml(startTime)}</span>
+        <span>End: ${escHtml(endTime)}</span>
+      </div>
+      <div style="text-align:center;color:var(--text2);font-weight:500">
+        Duration: ${formatDuration(totalDuration)}
+      </div>
+    </div>`;
+        }
+
+        let html = `<div class="wf-stats">
+    <div class="wf-stat"><div class="wf-stat-n" style="color:var(--text)">${entries.length.toLocaleString()}</div><div class="wf-stat-l">Entries</div></div>
+    <div class="wf-stat"><div class="wf-stat-n" style="color:var(--error)">${counts.error}</div><div class="wf-stat-l">Errors</div></div>
+    <div class="wf-stat"><div class="wf-stat-n" style="color:var(--warn)">${counts.warn}</div><div class="wf-stat-l">Warnings</div></div>
+    <div class="wf-stat"><div class="wf-stat-n" style="color:var(--info)">${counts.info}</div><div class="wf-stat-l">Info</div></div>
+  </div>${timeRangeHTML}`;
+
+        WORKFLOW_PHASES.forEach((ph) => {
+          const visSteps = ph.steps.filter((s) => s.count > 0);
+          if (!visSteps.length) return;
+
+          html += `<div class="wf-phase"><div class="wf-phase-title">${ph.title}</div>`;
+
+          visSteps.forEach((step, si) => {
+            const hasErr = step.errCount > 0;
+            const hasWarn = step.warnCount > 0;
+            const isActive = activeWorkflowStep === step.id;
+            const dot = hasErr ? "err" : step.dot;
+            const badge = hasErr
+              ? `<span class="wf-badge wb-err">${step.errCount} err</span>`
+              : hasWarn
+                ? `<span class="wf-badge wb-warn">${step.warnCount} warn</span>`
+                : `<span class="wf-badge wb-ok">${step.count}</span>`;
+
+            // Build timeline bar
+            let timelineBar = "";
+            if (step.firstTime && totalDuration > 0) {
+              const startOffset =
+                (parseTimestamp(step.firstTime) - parseTimestamp(allTimes[0])) /
+                1000;
+              const stepDur = step.duration || 0;
+              const startPct = (startOffset / totalDuration) * 100;
+              const widthPct = Math.max(2, (stepDur / totalDuration) * 100);
+
+              const barColor = hasErr
+                ? "var(--error)"
+                : hasWarn
+                  ? "var(--warn)"
+                  : step.dot === "ok"
+                    ? "var(--green)"
+                    : step.dot === "cycle"
+                      ? "var(--purple)"
+                      : "var(--info)";
+
+              timelineBar = `<div style="height:4px;background:var(--bg);border-radius:2px;margin-top:4px;position:relative;overflow:hidden">
+          <div style="position:absolute;left:${startPct.toFixed(1)}%;width:${widthPct.toFixed(1)}%;height:100%;background:${barColor};opacity:0.7;border-radius:2px" title="${formatDuration(stepDur)}"></div>
+        </div>`;
+            }
+
+            // Time and duration info
+            let timeInfo = "";
+            if (step.firstTime) {
+              const time = step.firstTime.split(" ")[1] || step.firstTime;
+              const durText = step.duration
+                ? ` • ${formatDuration(step.duration)}`
+                : "";
+              timeInfo = `<div style="font-size:9px;color:var(--text3);margin-top:2px">${time}${durText}</div>`;
+            }
+
+            html += `<div class="wf-step ${isActive ? "active" : ""}" onclick="toggleWorkflowFilter('${step.id}', ${JSON.stringify(step.acts).replace(/"/g, "&quot;")})">
+        <div class="wf-dot ${dot}"></div>
+        <div style="flex:1;min-width:0">
+          <div class="wf-label">${step.label}</div>
+          <div class="wf-sub">${step.sub}</div>
+          ${timeInfo}
+          ${timelineBar}
+        </div>
+        ${badge}
+      </div>`;
+
+            if (si < visSteps.length - 1) {
+              html += '<div class="wf-divider"></div>';
+            }
+          });
+
+          html += "</div>";
+        });
+
+        content.innerHTML = html;
+      }
+
+      function toggleWorkflowFilter(id, acts) {
+        if (activeWorkflowStep === id) {
+          activeWorkflowStep = null;
+        } else {
+          activeWorkflowStep = id;
+        }
+        buildWorkflow();
+        applyFilters();
+      }
+
+      // ─── DROPDOWNS ───
+      function rebuildDropdowns() {
+        const all = FILES.flatMap((f) => f.entries);
+        const comps = [
+          ...new Set(all.map((e) => e.component).filter(Boolean)),
+        ].sort();
+        const acts = [
+          ...new Set(all.map((e) => e.activity).filter(Boolean)),
+        ].sort();
+
+        document.getElementById("compFilter").innerHTML =
+          '<option value="">All components</option>' +
+          comps
+            .map((c) => `<option value="${escHtml(c)}">${escHtml(c)}</option>`)
+            .join("");
+
+        document.getElementById("actFilter").innerHTML =
+          '<option value="">All activities</option>' +
+          acts
+            .map((a) => `<option value="${escHtml(a)}">${escHtml(a)}</option>`)
+            .join("");
+      }
+
+      // ─── HIGHLIGHT ───
+      function clearHighlight() {
+        document.getElementById("highlightInput").value = "";
+        highlightQuery = "";
+        highlightedIndices = [];
+        currentHighlightIdx = -1;
+        updateHighlightCount();
+        renderList(
+          document.getElementById("searchInput").value.trim().toLowerCase(),
+        );
+      }
+
+      function updateHighlightCount() {
+        const countEl = document.getElementById("highlightCount");
+        if (!countEl) return;
+        if (highlightedIndices.length === 0) {
+          countEl.textContent = "";
+        } else {
+          const displayIdx =
+            currentHighlightIdx >= 0 ? currentHighlightIdx + 1 : 0;
+          countEl.textContent = `${displayIdx}/${highlightedIndices.length}`;
+        }
+      }
+
+      function goToNextHighlight(direction = 1) {
+        if (highlightedIndices.length === 0) return;
+        currentHighlightIdx =
+          (currentHighlightIdx + direction + highlightedIndices.length) %
+          highlightedIndices.length;
+        const targetIdx = highlightedIndices[currentHighlightIdx];
+        updateHighlightCount();
+        showDetail(targetIdx);
+
+        // Scroll to show the target item at top of view
+        const list = document.getElementById("logList");
+        const itemHeight = currentView === "compact" ? 38 : 58;
+
+        // Scroll to position with small top offset for visibility
+        const targetScrollTop = Math.max(0, targetIdx * itemHeight - 1350);
+        list.scrollTop = targetScrollTop;
+      }
+
+      // ─── FILTER ───
+      function clearTimeFilter() {
+        document.getElementById("timeStart").value = "";
+        document.getElementById("timeEnd").value = "";
+        applyFilters();
+      }
+
+      function applyFilters() {
+        const query = document
+          .getElementById("searchInput")
+          .value.trim()
+          .toLowerCase();
+        const comp = document.getElementById("compFilter").value;
+        const act = document.getElementById("actFilter").value;
+        const sort = document.getElementById("sortOrder").value;
+        const timeStart = document.getElementById("timeStart").value; // HH:MM
+        const timeEnd = document.getElementById("timeEnd").value; // HH:MM
+
+        let pool = getEntries();
+
+        // Get workflow step activities if active
+        let workflowActs = null;
+        if (activeWorkflowStep) {
+          WORKFLOW_PHASES.forEach((ph) => {
+            const step = ph.steps.find((s) => s.id === activeWorkflowStep);
+            if (step) workflowActs = step.acts;
+          });
+        }
+
+        filtered = pool.filter((e) => {
+          if (activeLevel !== "all" && e.level !== activeLevel) return false;
+          if (comp && e.component !== comp) return false;
+          if (act && e.activity !== act) return false;
+          if (workflowActs && !workflowActs.some((a) => e.activity.includes(a)))
+            return false;
+
+          // Time range filter
+          if (timeStart || timeEnd) {
+            const entryTime = extractTime(e.dateTime); // "HH:MM:SS"
+            if (timeStart && entryTime < timeStart) return false;
+            if (timeEnd && entryTime > timeEnd) return false;
+          }
+
+          if (query) {
+            const hay = (
+              e.activity +
+              " " +
+              e.message +
+              " " +
+              e.component +
+              " " +
+              e.context +
+              " " +
+              e.dateTime
+            ).toLowerCase();
+            if (!hay.includes(query)) return false;
+          }
+          return true;
+        });
+
+        if (sort === "desc") filtered = [...filtered].reverse();
+
+        // Update stats
+        const all = getEntries();
+        const c = { info: 0, debug: 0, warn: 0, error: 0 };
+        all.forEach((e) => {
+          if (c[e.level] !== undefined) c[e.level]++;
+        });
+
+        document.getElementById("st-all").textContent =
+          all.length.toLocaleString();
+        document.getElementById("st-info").textContent =
+          c.info.toLocaleString();
+        document.getElementById("st-debug").textContent =
+          c.debug.toLocaleString();
+        document.getElementById("st-warn").textContent =
+          c.warn.toLocaleString();
+        document.getElementById("st-error").textContent =
+          c.error.toLocaleString();
+        document.getElementById("entryCount").textContent =
+          `${filtered.length.toLocaleString()} / ${all.length.toLocaleString()}`;
+
+        selectedIdx = -1;
+        document.getElementById("detailContent").className = "";
+        document.getElementById("detailEmpty").style.display = "flex";
+
+        renderList(query);
+      }
+
+      function filterLevel(level) {
+        activeLevel = level;
+        document
+          .querySelectorAll(".stat-cell")
+          .forEach((c) => c.classList.remove("active"));
+        const map = {
+          all: ".all",
+          info: ".info-s",
+          debug: ".debug-s",
+          warn: ".warn-s",
+          error: ".error-s",
+        };
+        document
+          .querySelector(`.stat-cell${map[level]}`)
+          .classList.add("active");
+        applyFilters();
+      }
+
+      function calculateRepeatCounts() {
+        repeatCounts = {};
+        for (let i = 0; i < filtered.length; i++) {
+          const current = filtered[i];
+          const key = `${current.activity}|${current.message}`;
+          let count = 1;
+
+          // Count forward repeats
+          for (let j = i + 1; j < filtered.length; j++) {
+            if (
+              filtered[j].activity === current.activity &&
+              filtered[j].message === current.message
+            ) {
+              count++;
+            } else {
+              break;
+            }
+          }
+
+          // Count backward repeats (if this is a repeat)
+          let backCount = 0;
+          for (let j = i - 1; j >= 0; j--) {
+            if (
+              filtered[j].activity === current.activity &&
+              filtered[j].message === current.message
+            ) {
+              backCount++;
+            } else {
+              break;
+            }
+          }
+
+          // Store count (all repeats in the sequence get same total count)
+          const totalCount = backCount + count;
+          repeatCounts[i] = backCount > 0 ? totalCount : count > 1 ? count : 0;
+        }
+      }
+
+      // ─── RENDER LIST ───
+      function renderList(query) {
+        const list = document.getElementById("logList");
+        const isCompact = currentView === "compact";
+        const isMulti = FILES.length > 1;
+
+        if (!filtered.length) {
+          list.innerHTML =
+            '<div class="empty-state">No matching entries<p>Try adjusting your filters or search query</p></div>';
+          list.scrollTop = 0;
+          return;
+        }
+
+        // Calculate repeated log sequences
+        calculateRepeatCounts();
+
+        // Reset virtual scroll
+        visibleStart = 0;
+        visibleEnd = Math.min(CHUNK_SIZE * 3, filtered.length); // Start with 3 chunks
+        list.scrollTop = 0; // Reset scroll to top
+
+        // Remove existing scroll listener
+        list.onscroll = null;
+
+        renderChunk(query);
+
+        // Add virtual scroll listener
+        list.onscroll = () => {
+          if (scrollTimeout) clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(() => handleScroll(query), 50);
+        };
+      }
+
+      function renderChunk(query) {
+        const list = document.getElementById("logList");
+        const isCompact = currentView === "compact";
+        const isMulti = FILES.length > 1;
+        const itemHeight = isCompact ? 38 : 58; // Approximate height per item
+
+        // Create spacer for items before visible range
+        const topSpacer = visibleStart * itemHeight;
+        const bottomSpacer = Math.max(
+          0,
+          (filtered.length - visibleEnd) * itemHeight,
+        );
+
+        const shown = filtered.slice(visibleStart, visibleEnd);
+
+        // Update highlightedIndices for entire filtered list
+        highlightedIndices = [];
+        if (highlightQuery) {
+          filtered.forEach((e, idx) => {
+            if (
+              (
+                e.activity +
+                " " +
+                e.message +
+                " " +
+                e.component +
+                " " +
+                e.context
+              )
+                .toLowerCase()
+                .includes(highlightQuery)
+            ) {
+              highlightedIndices.push(idx);
+            }
+          });
+        }
+        updateHighlightCount();
+
+        let html = "";
+
+        if (topSpacer > 0) {
+          html += `<div style="height:${topSpacer}px"></div>`;
+        }
+
+        html += shown
+          .map((e, idx) => {
+            const fi = visibleStart + idx;
+            const timePart = e.dateTime
+              ? e.dateTime.split(" ")[1] || e.dateTime
+              : "";
+            const fileTag =
+              isMulti && activeFileIdx === -1
+                ? `<span class="entry-file" style="color:${fileColor(e.file)};border-color:${fileColor(e.file)}60">${escHtml(e.file.replace(/\.log$/i, "").slice(-12))}</span>`
+                : "";
+            const msgPart =
+              e.message && !isCompact
+                ? `<div class="entry-row2"><span class="entry-msg">${hlText(e.message, query)}</span>${fileTag}</div>`
+                : "";
+            const levelClass = e.level;
+            const hasHighlight =
+              highlightQuery &&
+              (
+                e.activity +
+                " " +
+                e.message +
+                " " +
+                e.component +
+                " " +
+                e.context
+              )
+                .toLowerCase()
+                .includes(highlightQuery);
+            const repeatCount = repeatCounts[fi] || 0;
+            const repeatBadge =
+              repeatCount > 1
+                ? `<span style="background:var(--warn);color:var(--bg);font-weight:600;padding:2px 6px;border-radius:3px;font-size:9px;margin-left:auto">×${repeatCount}</span>`
+                : "";
+
+            return `<div class="log-entry${isCompact ? " compact" : ""}${hasHighlight ? " highlight" : ""}" data-fi="${fi}" onclick="showDetail(${fi})">
+      <div class="entry-bar ${levelClass}"></div>
+      <div class="entry-body">
+        <div class="entry-row1">
+          <span class="level-badge lb-${levelClass}">${e.level}</span>
+          <span class="entry-activity">${hlText(e.activity, query)}</span>
+          <span class="entry-comp">${escHtml(e.component)}</span>
+          <span class="entry-time">${timePart}</span>
+          ${repeatBadge}
+        </div>
+        ${msgPart}
+      </div>
+    </div>`;
+          })
+          .join("");
+
+        if (bottomSpacer > 0) {
+          html += `<div style="height:${bottomSpacer}px"></div>`;
+        }
+
+        list.innerHTML = html;
+      }
+
+      function handleScroll(query) {
+        const list = document.getElementById("logList");
+        const scrollTop = list.scrollTop;
+        const scrollHeight = list.scrollHeight;
+        const clientHeight = list.clientHeight;
+        const itemHeight = currentView === "compact" ? 38 : 58;
+
+        // Calculate which items should be visible
+        const scrollPosition = scrollTop / itemHeight;
+        const buffer = CHUNK_SIZE; // Buffer on each side
+
+        const newStart = Math.max(0, Math.floor(scrollPosition) - buffer);
+        const newEnd = Math.min(
+          filtered.length,
+          Math.ceil(scrollPosition + clientHeight / itemHeight) + buffer,
+        );
+
+        // Only update if we've scrolled significantly
+        if (
+          Math.abs(newStart - visibleStart) > CHUNK_SIZE / 2 ||
+          Math.abs(newEnd - visibleEnd) > CHUNK_SIZE / 2
+        ) {
+          visibleStart = newStart;
+          visibleEnd = newEnd;
+          renderChunk(query);
+        }
+      }
+
+      // ─── MOBILE PANELS ───
+      function toggleWorkflowPanel() {
+        const panel = document.getElementById("workflowPanel");
+        const backdrop = document.getElementById("panelBackdrop");
+        const isOpen = panel.classList.contains("open");
+
+        if (isOpen) {
+          panel.classList.remove("open");
+          backdrop.classList.remove("visible");
+        } else {
+          document.getElementById("detailPanel").classList.remove("open");
+          panel.classList.add("open");
+          backdrop.classList.add("visible");
+        }
+      }
+
+      function toggleDetailPanel() {
+        const panel = document.getElementById("detailPanel");
+        const backdrop = document.getElementById("panelBackdrop");
+        const isOpen = panel.classList.contains("open");
+
+        if (isOpen) {
+          panel.classList.remove("open");
+          backdrop.classList.remove("visible");
+        } else {
+          document.getElementById("workflowPanel").classList.remove("open");
+          panel.classList.add("open");
+          backdrop.classList.add("visible");
+        }
+      }
+
+      function closePanels() {
+        document.getElementById("workflowPanel").classList.remove("open");
+        document.getElementById("detailPanel").classList.remove("open");
+        document.getElementById("panelBackdrop").classList.remove("visible");
+      }
+
+      // ─── DETAIL ───
+      function showDetail(fi) {
+        selectedIdx = fi;
+        document
+          .querySelectorAll(".log-entry")
+          .forEach((el) => el.classList.remove("selected"));
+        document
+          .querySelector(`.log-entry[data-fi="${fi}"]`)
+          ?.classList.add("selected");
+
+        // Auto-open detail panel on mobile
+        if (window.innerWidth <= 768) {
+          toggleDetailPanel();
+        }
+
+        const e = filtered[fi];
+        if (!e) return;
+
+        document.getElementById("detailEmpty").style.display = "none";
+        const content = document.getElementById("detailContent");
+        content.className = "visible";
+
+        let ctxHTML = "";
+        if (e.context && e.context.trim() !== "{}" && e.context.trim() !== "") {
+          let formatted = e.context;
+          try {
+            formatted = JSON.stringify(JSON.parse(e.context), null, 2);
+            formatted = syntaxHighlightJSON(formatted);
+          } catch (_) {
+            formatted = escHtml(e.context);
+          }
+          ctxHTML = `<div class="detail-section">
+      <div class="detail-section-label">Context</div>
+      <div class="ctx-box">${formatted}</div>
+    </div>`;
+        }
+
+        const fileRow =
+          FILES.length > 1
+            ? `<span class="dk">File</span><span class="dv" style="color:${fileColor(e.file)}">${escHtml(e.file)}</span>`
+            : "";
+
+        content.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-level-dot dld-${e.level}"></div>
+      <div>
+        <div class="detail-title">${escHtml(e.activity || "—")}</div>
+        <div class="detail-subtitle">${escHtml(e.component || "—")}</div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-label">Entry Details</div>
+      <div class="detail-kv">
+        <span class="dk">Level</span><span class="dv" style="color:var(--${e.level})">${e.level}</span>
+        <span class="dk">Message</span><span class="dv">${escHtml(e.message || "—")}</span>
+        <span class="dk">Component</span><span class="dv">${escHtml(e.component || "—")}</span>
+        <span class="dk">DateTime</span><span class="dv">${escHtml(e.dateTime || "—")}</span>
+        <span class="dk">MAC</span><span class="dv">${escHtml(e.macaddress || "—")}</span>
+        ${fileRow}
+      </div>
+    </div>
+
+    ${ctxHTML}
+
+    <button class="copy-btn" onclick="copyEntry(${fi})">Copy as JSON</button>
+  `;
+      }
+
+      function copyEntry(fi) {
+        navigator.clipboard
+          .writeText(JSON.stringify(filtered[fi], null, 2))
+          .then(() => {
+            const btn = document.querySelector(".copy-btn");
+            if (btn) {
+              btn.textContent = "Copied!";
+              setTimeout(() => {
+                btn.textContent = "Copy as JSON";
+              }, 1500);
+            }
+          });
+      }
+
+      function syntaxHighlightJSON(str) {
+        return escHtml(str).replace(
+          /("(?:[^"\\]|\\.)*")(\s*:)|("(?:[^"\\]|\\.)*")|(true|false)|(null)|(-?\d+(?:\.\d+)?)/g,
+          (m, key, colon, str_, bool, nil, num) => {
+            if (key && colon) return `<span class="jk">${key}</span>${colon}`;
+            if (str_) return `<span class="js">${str_}</span>`;
+            if (bool) return `<span class="jb">${bool}</span>`;
+            if (nil) return `<span class="jnu">null</span>`;
+            if (num) return `<span class="jn">${num}</span>`;
+            return m;
+          },
+        );
+      }
+
+      // ─── VIEW ───
+      function setView(v) {
+        currentView = v;
+        ["List", "Compact"].forEach((n) => {
+          const id = "btn" + n;
+          document
+            .getElementById(id)
+            .classList.toggle("active", n.toLowerCase() === v);
+        });
+        renderList(
+          document.getElementById("searchInput").value.trim().toLowerCase(),
+        );
+      }
+
+      // ─── UTILS ───
+      function escHtml(s) {
+        if (!s) return "";
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function hlText(text, query) {
+        if (!query || !text) return escHtml(text);
+        const safe = escHtml(text);
+        const re = new RegExp(
+          `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+          "gi",
+        );
+        return safe.replace(re, "<mark>$1</mark>");
+      }
+
+      function formatDuration(seconds) {
+        if (!seconds || seconds < 0) return "0s";
+        if (seconds < 60) return `${seconds.toFixed(1)}s`;
+        if (seconds < 3600) {
+          const min = Math.floor(seconds / 60);
+          const sec = Math.floor(seconds % 60);
+          return `${min}m ${sec}s`;
+        }
+        const hrs = Math.floor(seconds / 3600);
+        const min = Math.floor((seconds % 3600) / 60);
+        return `${hrs}h ${min}m`;
+      }
+
+      // ─── EVENTS ───
+      document
+        .getElementById("fileInput")
+        .addEventListener("change", function () {
+          if (this.files.length) loadFiles(this.files);
+          this.value = "";
+        });
+
+      [
+        "searchInput",
+        "compFilter",
+        "actFilter",
+        "sortOrder",
+        "timeStart",
+        "timeEnd",
+      ].forEach((id) => {
+        const el = document.getElementById(id);
+        el.addEventListener(
+          id === "searchInput" ? "input" : "change",
+          applyFilters,
+        );
+      });
+
+      // Highlight input listener
+      document
+        .getElementById("highlightInput")
+        .addEventListener("input", () => {
+          highlightQuery = document
+            .getElementById("highlightInput")
+            .value.trim()
+            .toLowerCase();
+          renderList(
+            document.getElementById("searchInput").value.trim().toLowerCase(),
+          );
+        });
+
+      // Highlight keyboard navigation
+      document
+        .getElementById("highlightInput")
+        .addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            goToNextHighlight(1);
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            goToNextHighlight(1);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            goToNextHighlight(-1);
+          }
+        });
+
+      // Drag & drop
+      const dropZone = document.getElementById("dropZone");
+      ["dragover", "dragenter"].forEach((ev) => {
+        document.addEventListener(ev, (e) => {
+          e.preventDefault();
+          dropZone.classList.add("drag-over");
+        });
+      });
+      ["dragleave", "dragend"].forEach((ev) => {
+        document.addEventListener(ev, () =>
+          dropZone.classList.remove("drag-over"),
+        );
+      });
+      document.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        if (e.dataTransfer.files.length) loadFiles(e.dataTransfer.files);
+      });
+
+      // Keyboard nav
+      document.addEventListener("keydown", (e) => {
+        if (!filtered.length) return;
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          const next = Math.min(selectedIdx + 1, filtered.length - 1);
+          showDetail(next);
+          document
+            .querySelector(`.log-entry[data-fi="${next}"]`)
+            ?.scrollIntoView({ block: "nearest" });
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          const prev = Math.max(selectedIdx - 1, 0);
+          showDetail(prev);
+          document
+            .querySelector(`.log-entry[data-fi="${prev}"]`)
+            ?.scrollIntoView({ block: "nearest" });
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+          e.preventDefault();
+          document.getElementById("searchInput").focus();
+        }
+        if (e.key === "Escape") {
+          document.getElementById("searchInput").value = "";
+          activeWorkflowStep = null;
+          buildWorkflow();
+          applyFilters();
+        }
+      });
+    </script>
+  </body>
+</html>
